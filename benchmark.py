@@ -326,11 +326,16 @@ def run_perf(arch, cpu_model, opencv_version, modules=None, jobs=None, threads=N
         if module == "dnn":
             cmd.append("--gtest_filter=-DNNTestNetwork*")
 
+        module_start = time.perf_counter()
         try:
             result = subprocess.run([str(x) for x in cmd], check=False, text=True, env=env)
         except OSError as exc:
             failed_modules.append((module, str(exc)))
             print(f"ERROR: Performance test module {module} failed: {exc}. Continuing.")
+            print(
+                f"PERFORMANCE TEST MODULE {module} ELAPSED TIME: "
+                f"{format_elapsed(time.perf_counter() - module_start)}"
+            )
             continue
 
         if result.returncode != 0:
@@ -339,6 +344,10 @@ def run_perf(arch, cpu_model, opencv_version, modules=None, jobs=None, threads=N
                 f"ERROR: Performance test module {module} failed "
                 f"with exit code {result.returncode}. Continuing."
             )
+        print(
+            f"PERFORMANCE TEST MODULE {module} ELAPSED TIME: "
+            f"{format_elapsed(time.perf_counter() - module_start)}"
+        )
 
     if failed_modules:
         failed_text = ", ".join(

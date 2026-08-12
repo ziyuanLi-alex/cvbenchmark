@@ -11,19 +11,10 @@ from pathlib import Path
 os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 sys.dont_write_bytecode = True
 
-OPENCV_4_MODULES = ["calib3d", "core", "features2d", "imgproc", "objdetect", "dnn"]
-OPENCV_5_MODULES = [
-    "calib",
-    "stereo",
-    "geometry",
-    "core",
-    "features",
-    "imgproc",
-    "objdetect",
-    "dnn",
-]
-OPENCV_4_ONLY_MODULES = {"calib3d", "features2d"}
-OPENCV_5_ONLY_MODULES = {"calib", "stereo", "geometry", "features"}
+OPENCV_4_MODULES = ["core", "imgproc", "features2d", "objdetect", "calib3d", "dnn"]
+OPENCV_5_MODULES = ["core", "imgproc", "features", "objdetect", "calib", "stereo", "geometry", "dnn"]
+OPENCV_4_ONLY_MODULES = {"features2d", "calib3d"}
+OPENCV_5_ONLY_MODULES = {"features", "calib", "stereo", "geometry"}
 ALL_KNOWN_MODULES = list(dict.fromkeys(OPENCV_4_MODULES + OPENCV_5_MODULES))
 AVAILABLE_ARCH_PARAM = ["x86", "arm", "riscv", "riscvv"]
 
@@ -512,7 +503,7 @@ def summarize_scores(opencv_version, modules, output_file):
     return score_df
 
 
-def create_figures(opencv_version, score_df):
+def create_figures(opencv_version, score_df, baseline_cpu):
     import matplotlib.patches as mpatches
     import matplotlib.pyplot as plt
     import numpy as np
@@ -523,61 +514,121 @@ def create_figures(opencv_version, score_df):
     with open("processor.json", "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    baseline = f"{data['baseline']['Processor']}\n{data['baseline']['Cores']}"
-    processors = [
-        f"{p['Processor']} | {p['Cores']} | {p['Arch']}"
-        for p in data["processors"]
-    ]
+    processors = data["processors"]
+    baseline_processors = [data["baseline"], *processors]
 
     devices = [c for c in score_df.columns if c != "module"]
 
     arch_colors = {
         "ARM": "#7233F7",
         "RISC-V": "#EDAC1A",
-        "x86_64": "#00C7FD",
+        "x86-64": "#00C7FD",
         "Unknown": "#A01A1E",
     }
+    arch_order = {
+        "RISC-V": 0,
+        "ARM": 1,
+        "x86-64": 2,
+        "Unknown": 3,
+    }
 
-    legend_items = [mpatches.Patch(color="gray", label="Baseline (ARM)")]
+    def find_processor_metadata(device, candidates):
+        for processor in candidates:
+            if device == processor["Processor"]:
+                return processor
+
+        prefix_matches = [
+            processor for processor in candidates
+            if device.startswith(f"{processor['Processor']}-")
+        ]
+        if prefix_matches:
+            return max(prefix_matches, key=lambda processor: len(processor["Processor"]))
+
+        return {
+            "Processor": device,
+            "Cores": "",
+            "Arch": "Unknown",
+        }
+
+    baseline_arch = find_processor_metadata(baseline_cpu, baseline_processors).get(
+        "Arch", data["baseline"].get("Arch", "Unknown")
+    )
+    legend_items = [mpatches.Patch(color="gray", label=f"Baseline ({baseline_arch})")]
     for arch, color in arch_colors.items():
         if arch != "Unknown":
             legend_items.append(mpatches.Patch(color=color, label=arch))
+
+    def find_processor(device):
+        return find_processor_metadata(device, processors)
+
+    def baseline_label():
+        processor = find_processor_metadata(baseline_cpu, baseline_processors)
+        cores = processor.get("Cores", "")
+        return f"{baseline_cpu}\n{cores}" if cores else baseline_cpu
+
+    def figure_layout(labels):
+        font_size = plt.rcParams["font.size"]
+        title_size = plt.rcParams.get("axes.titlesize", font_size)
+        if isinstance(title_size, str):
+            title_size = font_size
+        line_height = font_size / 72 * 1.35
+        title_height = title_size / 72 * 1.8
+        legend_height = len(legend_items) * line_height
+        row_height = max(label.count("\n") + 1 for label in labels) * line_height * 1.25
+        figure_height = title_height + legend_height + len(labels) * row_height
+        bar_height = min(0.85, (font_size / 72 * 2.2) / row_height)
+        return figure_height, bar_height
+
+    ordered_devices = sorted(
+        devices,
+        key=lambda device: (
+            arch_order.get(find_processor(device).get("Arch", "Unknown"), arch_order["Unknown"]),
+            devices.index(device),
+        ),
+    )
 
     for _, row in score_df.iterrows():
         module_name = row["module"]
         score_map = dict(zip(devices, row[devices].astype(float)))
 
-        labels = [baseline]
+        labels = [baseline_label()]
         scores = [100]
         colors = ["gray"]
 
-        for processor in processors:
-            soc, cores, arch = [x.strip() for x in processor.split("|")]
-            if soc in score_map:
-                labels.append(f"{soc}\n{cores}")
-                scores.append(score_map[soc])
-                colors.append(arch_colors.get(arch, arch_colors["Unknown"]))
+        for device in ordered_devices:
+            processor = find_processor(device)
+            cores = processor.get("Cores", "")
+            arch = processor.get("Arch", "Unknown")
+            label = f"{device}\n{cores}" if cores else device
+            labels.append(label)
+            scores.append(score_map[device])
+            colors.append(arch_colors.get(arch, arch_colors["Unknown"]))
 
-        plt.figure(figsize=(10, 0.5 * len(labels)))
+        figure_height, bar_height = figure_layout(labels)
+        fig, ax = plt.subplots(figsize=(10, figure_height), constrained_layout=True)
 
         y_pos = np.arange(len(labels))
-        bars = plt.barh(y_pos, scores, color=colors)
+        bars = ax.barh(y_pos, scores, height=bar_height, color=colors)
         bars[0].set_color("gray")
 
-        plt.tick_params(axis="y", length=0)
-        plt.yticks(y_pos, labels, fontweight="bold")
-        plt.xticks([])
+        ax.tick_params(axis="y", length=0)
+        ax.set_yticks(y_pos, labels, fontweight="bold")
+        ax.set_xticks([])
 
         title = "Processor Benchmark" if module_name == "Score" else module_name
-        plt.title(title, fontweight="bold")
-        plt.legend(handles=legend_items, loc="upper right", frameon=False)
-        plt.gca().invert_yaxis()
+        ax.set_title(title, fontweight="bold", pad=16)
+        ax.legend(
+            handles=legend_items,
+            loc="upper right",
+            frameon=False,
+        )
+        ax.invert_yaxis()
 
-        for spine in plt.gca().spines.values():
+        for spine in ax.spines.values():
             spine.set_visible(False)
 
         for bar, score in zip(bars, scores):
-            plt.text(
+            ax.text(
                 bar.get_width(),
                 bar.get_y() + bar.get_height() / 2,
                 f" {score:.2f}",
@@ -586,11 +637,11 @@ def create_figures(opencv_version, score_df):
                 fontsize=9,
             )
 
-        plt.tight_layout()
+        ax.margins(x=0.08)
         output_path = score_dir / f"{module_name}.png"
         print(f"Saving figure for {module_name}...")
-        plt.savefig(output_path)
-        plt.close()
+        fig.savefig(output_path, bbox_inches="tight")
+        plt.close(fig)
 
 
 def score_perf(opencv_version, baseline, modules, output, figure):
@@ -602,7 +653,7 @@ def score_perf(opencv_version, baseline, modules, output, figure):
     score_df = summarize_scores(opencv_version, modules, output)
 
     if figure:
-        create_figures(opencv_version, score_df)
+        create_figures(opencv_version, score_df, baseline)
 
 
 def add_run_args(parser):

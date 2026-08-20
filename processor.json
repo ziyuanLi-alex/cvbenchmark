@@ -68,12 +68,12 @@
     {
       "Processor": "Intel Core i7-12700K",
       "Cores": "3.6 GHz (12 cores)",
-      "Arch": "x86_64"
+      "Arch": "x86-64"
     },
     {
       "Processor": "Intel Core i9-9880H",
       "Cores": "2.3 GHz (8 cores)",
-      "Arch": "x86_64"
+      "Arch": "x86-64"
     }
   ]
 }

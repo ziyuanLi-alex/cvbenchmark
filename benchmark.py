@@ -637,7 +637,8 @@ def create_figures(opencv_version, score_df, baseline_cpu):
                 fontsize=9,
             )
 
-        ax.margins(x=0.08)
+        max_score = max(scores) if scores else 100
+        ax.set_xlim(0, max_score * 1.45)
         output_path = score_dir / f"{module_name}.png"
         print(f"Saving figure for {module_name}...")
         fig.savefig(output_path, bbox_inches="tight")

@@ -662,8 +662,8 @@ def add_run_args(parser):
         help="Target architecture for building OpenCV. Available: x86, arm, riscv, riscvv")
     parser.add_argument("--cpu-model", required=True,
         help="CPU model name for the target device. Used in result file names.")
-    parser.add_argument("--version", default="4.13.0",
-        help="OpenCV version (branch, tag, or commit) to build and run performance tests. Default: 4.13.0")
+    parser.add_argument("--version", default="5.x",
+        help="OpenCV version (branch, tag, or commit) to build and run performance tests. Default: 5.x")
     parser.add_argument("--modules", nargs="+",
         help="List of modules to run performance tests.")
     parser.add_argument("--jobs", "-j", type=positive_int,
@@ -684,8 +684,8 @@ def main():
     score_parser = subparsers.add_parser(
         "score", help="Compare XML results and compute CPU scores."
     )
-    score_parser.add_argument("--version", default="4.13.0",
-        help="OpenCV version (branch, tag, or commit) to compute scores. Default: 4.13.0")
+    score_parser.add_argument("--version", default="5.x",
+        help="OpenCV version (branch, tag, or commit) to compute scores. Default: 5.x")
     score_parser.add_argument("--baseline", default="Broadcom BCM2711",
         help="Baseline CPU model name for comparison. Default: Broadcom BCM2711")
     score_parser.add_argument("--modules", nargs="+",

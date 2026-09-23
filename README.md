@@ -82,7 +82,7 @@ Run `benchmark.py bench` to get the CPU score of your device against Broadcom BC
 python benchmark.py bench --arch riscvv --cpu-model 'SpacemiT K3' --figure
 ```
 
-If you want to compute the score against another baseline CPU or with another version of OpenCV (default version is 4.13.0), run for example:
+If you want to compute the score against another baseline CPU or with another version of OpenCV (default version is the `5.x` branch), run for example:
 ```bash
 python benchmark.py bench --arch riscvv --cpu-model 'SpacemiT K3' --version 5.0.0 --baseline 'Rockchip RK3588' --figure
 ```
@@ -114,7 +114,7 @@ Run `python benchmark.py perf --help` for for usage information.
 python benchmark.py score
 ```
 
-By default, this scores OpenCV `4.13.0` results against the baseline CPU `Broadcom BCM2711`.
+By default, this scores OpenCV `5.x` results against the baseline CPU `Broadcom BCM2711`. A matching `5.x` baseline XML is required; the committed `5.0.0` baseline is for the older release tag.
 
 Use:
 - `--version` to score another OpenCV version.
